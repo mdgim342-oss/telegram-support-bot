@@ -1,14 +1,10 @@
 services:
   - type: web
-    name: telegram-support-bot
+    name: bengali-support-bot
     runtime: node
-    repo: https://github.com/আপনার-ইউজারনেম/telegram-support-bot
     plan: free
+    buildCommand: npm install
+    startCommand: npm start
     envVars:
       - key: BOT_TOKEN
         sync: false
-      - key: SUPPORT_GROUP_LINK
-        value: https://t.me/+pT5CQm1MGag1OWM1
-    buildCommand: npm install
-    startCommand: npm start
-    healthCheckPath: /health
