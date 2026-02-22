@@ -227,16 +227,19 @@ bot.action('not_helpful', (ctx) => {
     keyboard
   );
 });
-
 // ========== Webhook setup ==========
-bot.telegram.setWebhook(`https://${process.env.RENDER_EXTERNAL_URL}/webhook/${BOT_TOKEN}`);
+const WEBHOOK_URL = `https://${process.env.RENDER_EXTERNAL_URL}/webhook/${BOT_TOKEN}`;
+console.log("Setting webhook to:", WEBHOOK_URL);
+
+bot.telegram.setWebhook(WEBHOOK_URL)
+  .then(() => console.log("✅ Webhook set successfully"))
+  .catch((err) => console.error("❌ Webhook error:", err));
 
 // ========== Start server ==========
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`🤖 Bot webhook: https://${process.env.RENDER_EXTERNAL_URL}/webhook/${BOT_TOKEN}`);
+  console.log(`🌐 Webhook URL: ${WEBHOOK_URL}`);
 });
-
 // Graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
