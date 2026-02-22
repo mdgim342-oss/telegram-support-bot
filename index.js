@@ -1,245 +1,137 @@
 const express = require('express');
-const { Telegraf, Markup } = require('telegraf');
-const dotenv = require('dotenv');
-const Fuse = require('fuse.js');
-
-dotenv.config();
-
+const { Telegraf } = require('telegraf');
 const app = express();
-const PORT = process.env.PORT || 3000;
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const SUPPORT_GROUP_LINK = process.env.SUPPORT_GROUP_LINK || "https://t.me/+pT5CQm1MGag1OWM1";
 
-// বট ইনিশিয়ালাইজ করুন
+// এনভায়রনমেন্ট ভেরিয়েবল
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const SUPPORT_GROUP = "https://t.me/+pT5CQm1MGag1OWM1";
+const PORT = process.env.PORT || 3000;
+
+// বট ইনিশিয়ালাইজ
 const bot = new Telegraf(BOT_TOKEN);
 
-// Express middleware
+// এক্সপ্রেস মিডলওয়্যার
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+// হেলথ চেক
+app.get('/', (req, res) => {
+  res.send('বট চলছে');
 });
 
-// Webhook endpoint
+// ওয়েবহুক এন্ডপয়েন্ট
 app.post(`/webhook/${BOT_TOKEN}`, (req, res) => {
   bot.handleUpdate(req.body, res);
 });
 
-// Root endpoint
-app.get('/', (req, res) => {
-  res.send('Telegram Support Bot is running!');
-});
+// সলিউশন লিস্ট
+const solutions = {
+  login: `🔐 **লগইন সমস্যার সমাধান**
 
-// ========== সলিউশন ডাটাবেস ==========
-const solutionsDB = [
-  {
-    category: 'login',
-    keywords: ['login', 'signin', 'password', 'forgot', 'can\'t login', 'access', 'log in'],
-    solution: `🔐 *Login Issue Solution*\n\n` +
-      `1. Check your internet connection\n` +
-      `2. Clear browser cache and cookies\n` +
-      `3. Reset your password using 'Forgot Password' option\n` +
-      `4. Use latest version of Telegram\n\n` +
-      `Still having issues? Contact support group.`
-  },
-  {
-    category: 'payment',
-    keywords: ['payment', 'pay', 'money', 'transaction', 'failed', 'refund', 'bkash', 'nagad', 'card'],
-    solution: `💰 *Payment Issue Solution*\n\n` +
-      `1. Check your balance before transaction\n` +
-      `2. Verify payment method details\n` +
-      `3. Wait 10-15 minutes for transaction confirmation\n` +
-      `4. Contact your bank/payment provider\n\n` +
-      `For refund issues, please contact support group.`
-  },
-  {
-    category: 'technical',
-    keywords: ['technical', 'error', 'bug', 'crash', 'slow', 'problem', 'issue', 'not working', 'glitch'],
-    solution: `⚙️ *Technical Issue Solution*\n\n` +
-      `1. Restart the application\n` +
-      `2. Clear app cache and data\n` +
-      `3. Update to latest version\n` +
-      `4. Restart your device\n` +
-      `5. Reinstall the application\n\n` +
-      `If problem persists, contact support group.`
-  }
-];
+১. আপনার ইন্টারনেট সংযোগ চেক করুন
+২. অ্যাপের ক্যাশে ক্লিয়ার করুন
+৩. পাসওয়ার্ড রিসেট করুন
+৪. টেলিগ্রাম আপডেট করুন
 
-// Fuse.js configuration
-const fuseOptions = {
-  includeScore: true,
-  threshold: 0.4,
-  keys: ['keywords']
+সমাধান না হলে সাপোর্ট গ্রুপে জয়েন করুন।`,
+
+  payment: `💰 **পেমেন্ট সমস্যার সমাধান**
+
+১. আপনার ব্যালেন্স চেক করুন
+২. পেমেন্ট মেথড ভেরিফাই করুন
+৩. ১০-১৫ মিনিট অপেক্ষা করুন
+৪. ব্যাংকে যোগাযোগ করুন
+
+সাহায্য দরকার? সাপোর্ট গ্রুপে জয়েন করুন।`,
+
+  technical: `⚙️ **টেকনিক্যাল সমস্যার সমাধান**
+
+১. অ্যাপ রিস্টার্ট করুন
+২. ক্যাশে ক্লিয়ার করুন
+৩. অ্যাপ আপডেট করুন
+৪. ফোন রিস্টার্ট করুন
+
+সমস্যা থাকলে সাপোর্ট গ্রুপে জয়েন করুন।`,
+
+  account: `👤 **অ্যাকাউন্ট সমস্যার সমাধান**
+
+১. সেটিংসে যান
+২. প্রোফাইল এডিট করুন
+৩. তথ্য আপডেট করুন
+৪. সেভ করুন
+
+সাহায্য দরকার? সাপোর্ট গ্রুপে জয়েন করুন।`,
+
+  default: `🤖 **আমার উত্তর দিতে সমস্যা হচ্ছে**
+
+দয়া করে আমাদের সাপোর্ট গ্রুপে জয়েন করুন:
+${SUPPORT_GROUP}
+
+সেখানে সাপোর্ট টিম আপনাকে সাহায্য করবে।`
 };
 
-const fuse = new Fuse(solutionsDB, fuseOptions);
-
-function findSolution(message) {
-  const results = fuse.search(message.toLowerCase());
-  if (results.length > 0 && results[0].score < 0.4) {
-    return results[0].item.solution;
-  }
-  return null;
-}
-
-// ========== বট কমান্ড হ্যান্ডলার ==========
-
-// /start command
+// স্টার্ট কমান্ড
 bot.start((ctx) => {
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback('📝 Report Problem', 'report')],
-    [Markup.button.callback('❓ Common Issues', 'common')],
-    [Markup.button.url('👥 Support Group', SUPPORT_GROUP_LINK)]
-  ]);
-  
   ctx.reply(
-    `👋 Welcome ${ctx.from.first_name}!\n\n` +
-    `I'm your support assistant. How can I help you?`,
-    keyboard
+    `👋 **স্বাগতম ${ctx.from.first_name}!**
+
+আমি আপনার সাপোর্ট অ্যাসিস্ট্যান্ট। নিচের যেকোনো সমস্যা লিখুন:
+
+🔐 লগইন সমস্যা
+💰 পেমেন্ট সমস্যা
+⚙️ টেকনিক্যাল সমস্যা
+👤 অ্যাকাউন্ট সমস্যা
+
+অথবা সরাসরি আপনার সমস্যা লিখুন।`
   );
 });
 
-// /support command
-bot.command('support', (ctx) => {
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback('🔐 Login Issues', 'solution_login')],
-    [Markup.button.callback('💰 Payment Issues', 'solution_payment')],
-    [Markup.button.callback('⚙️ Technical Issues', 'solution_technical')],
-    [Markup.button.callback('📝 Describe Problem', 'report')],
-    [Markup.button.url('👥 Support Group', SUPPORT_GROUP_LINK)]
-  ]);
-  
-  ctx.reply('🆘 *Support Menu*\n\nPlease select your issue type:', {
-    parse_mode: 'Markdown',
-    ...keyboard
-  });
-});
-
-// Button handlers
-bot.action(/solution_(.+)/, (ctx) => {
-  const category = ctx.match[1];
-  const solutionMap = {
-    'login': solutionsDB[0].solution,
-    'payment': solutionsDB[1].solution,
-    'technical': solutionsDB[2].solution
-  };
-  
-  const solution = solutionMap[category] || 'Solution not found.';
-  
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.url('👥 Join Support Group', SUPPORT_GROUP_LINK)],
-    [Markup.button.callback('🔙 Back to Menu', 'back_to_menu')]
-  ]);
-  
-  ctx.editMessageText(solution, {
-    parse_mode: 'Markdown',
-    ...keyboard
-  });
-});
-
-bot.action('report', (ctx) => {
+// হেল্প কমান্ড
+bot.help((ctx) => {
   ctx.reply(
-    '📝 *Please describe your problem in detail*\n\n' +
-    'Include:\n' +
-    '• What happened?\n' +
-    '• When did it happen?\n' +
-    '• Any error messages?\n\n' +
-    'I will try to find a solution for you.'
+    `📝 **যেভাবে ব্যবহার করবেন:**
+
+• লগইন সমস্যা লিখুন
+• পেমেন্ট সমস্যা লিখুন
+• টেকনিক্যাল সমস্যা লিখুন
+• অ্যাকাউন্ট সমস্যা লিখুন
+
+আমি স্বয়ংক্রিয়ভাবে সমাধান দেব।`
   );
 });
 
-bot.action('common', (ctx) => {
-  let commonIssues = '*Common Issues:*\n\n';
-  solutionsDB.forEach(item => {
-    commonIssues += `• ${item.category}: ${item.keywords.slice(0, 3).join(', ')}...\n`;
-  });
+// মেসেজ হ্যান্ডলার
+bot.on('text', (ctx) => {
+  const text = ctx.message.text.toLowerCase();
   
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback('🔙 Back to Menu', 'back_to_menu')]
-  ]);
-  
-  ctx.editMessageText(commonIssues, {
-    parse_mode: 'Markdown',
-    ...keyboard
-  });
-});
-
-bot.action('back_to_menu', (ctx) => {
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback('📝 Report Problem', 'report')],
-    [Markup.button.callback('❓ Common Issues', 'common')],
-    [Markup.button.url('👥 Support Group', SUPPORT_GROUP_LINK)]
-  ]);
-  
-  ctx.editMessageText('🆘 *Support Menu*\n\nHow can I help you?', {
-    parse_mode: 'Markdown',
-    ...keyboard
-  });
-});
-
-// Text message handler
-bot.on('text', async (ctx) => {
-  const message = ctx.message.text;
-  
-  // Skip commands
-  if (message.startsWith('/')) return;
-  
-  // Find solution
-  const solution = findSolution(message);
-  
-  if (solution) {
-    const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('✅ Helpful', 'helpful')],
-      [Markup.button.callback('❌ Not Helpful', 'not_helpful')]
-    ]);
-    
-    await ctx.reply(solution, {
-      parse_mode: 'Markdown',
-      ...keyboard
-    });
-  } else {
-    // No solution found - redirect to group
-    const keyboard = Markup.inlineKeyboard([
-      [Markup.button.url('👥 Join Support Group', SUPPORT_GROUP_LINK)]
-    ]);
-    
-    await ctx.reply(
-      `🤔 I couldn't find an automatic solution.\n\n` +
-      `Please join our support group for help:\n${SUPPORT_GROUP_LINK}`,
-      keyboard
-    );
+  // লগইন সমস্যা চেক
+  if (text.includes('লগইন') || text.includes('login') || text.includes('পাসওয়ার্ড') || text.includes('password') || text.includes('সাইনইন') || text.includes('signin')) {
+    return ctx.reply(solutions.login);
   }
-});
-
-bot.action('helpful', (ctx) => {
-  ctx.editMessageText('🙏 Thanks for your feedback! Use /support if you need more help.');
-});
-
-bot.action('not_helpful', (ctx) => {
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.url('👥 Join Support Group', SUPPORT_GROUP_LINK)]
-  ]);
   
-  ctx.editMessageText(
-    '😔 Sorry it wasn\'t helpful. Please join our support group:',
-    keyboard
-  );
+  // পেমেন্ট সমস্যা চেক
+  if (text.includes('পেমেন্ট') || text.includes('payment') || text.includes('টাকা') || text.includes('money') || text.includes('বিকাশ') || text.includes('bkash') || text.includes('নগদ') || text.includes('nagad')) {
+    return ctx.reply(solutions.payment);
+  }
+  
+  // টেকনিক্যাল সমস্যা চেক
+  if (text.includes('টেকনিক্যাল') || text.includes('technical') || text.includes('এরর') || text.includes('error') || text.includes('সমস্যা') || text.includes('problem') || text.includes('ইস্যু') || text.includes('issue')) {
+    return ctx.reply(solutions.technical);
+  }
+  
+  // অ্যাকাউন্ট সমস্যা চেক
+  if (text.includes('অ্যাকাউন্ট') || text.includes('account') || text.includes('প্রোফাইল') || text.includes('profile') || text.includes('সেটিং') || text.includes('setting')) {
+    return ctx.reply(solutions.account);
+  }
+  
+  // কোন কিছু না মিললে ডিফল্ট উত্তর
+  ctx.reply(solutions.default);
 });
-// ========== Webhook setup ==========
-const WEBHOOK_URL = `https://${process.env.RENDER_EXTERNAL_URL}/webhook/${BOT_TOKEN}`;
-console.log("Setting webhook to:", WEBHOOK_URL);
 
-bot.telegram.setWebhook(WEBHOOK_URL)
-  .then(() => console.log("✅ Webhook set successfully"))
-  .catch((err) => console.error("❌ Webhook error:", err));
-
-// ========== Start server ==========
+// সার্ভার চালু
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`🌐 Webhook URL: ${WEBHOOK_URL}`);
+  console.log(`✅ বট চলছে পোর্ট ${PORT} এ`);
 });
-// Graceful shutdown
+
+// গ্রেসফুল শাটডাউন
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
